@@ -1,0 +1,98 @@
+// Flowmend Database Schema
+// Supports both SQLite (dev) and PostgreSQL (prod)
+
+datasource db {
+  provider = "sqlite" // Change to "postgresql" for production
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ============================================================================
+// SHOPS
+// ============================================================================
+
+model Shop {
+  id            String    @id // Shopify shop domain (e.g., "example.myshopify.com")
+  accessToken   String    // OAuth access token (encrypted at rest)
+  scopes        String    // Comma-separated list of OAuth scopes
+  installedAt   DateTime  @default(now())
+  uninstalledAt DateTime? // Null if currently installed
+
+  // Billing fields
+  subscriptionId     String?   // Shopify AppSubscription GID
+  subscriptionStatus String?   // ACTIVE | CANCELLED | DECLINED | EXPIRED | FROZEN | PENDING | null
+  planName           String?   // e.g., "Pro"
+  trialEndsAt        DateTime? // Trial expiration (7 days from activation)
+  billingInterval    String?   // MONTHLY | ANNUAL
+
+  jobs Job[]
+
+  @@index([installedAt])
+  @@index([subscriptionStatus])
+}
+
+// ============================================================================
+// JOBS
+// ============================================================================
+
+model Job {
+  id        String    @id @default(uuid())
+  shopId    String
+  status    String @default("PENDING") // PENDING | RUNNING | COMPLETED | FAILED
+
+  // Input parameters (from Flow action request)
+  queryString String // Shopify product search query
+  namespace   String // Metafield namespace
+  key         String // Metafield key
+  type        String // MetafieldType as string (e.g., "single_line_text_field")
+  value       String // Raw value; interpret based on type (max 1KB in practice)
+  dryRun      Boolean @default(true) // Safety default
+  maxItems    Int     @default(10000) // Hard cap at 100,000
+
+  // Results (populated after execution)
+  matchedCount Int? // Products matched by query
+  updatedCount Int? // Products successfully updated
+  failedCount  Int? // Products that failed
+
+  // Error handling
+  errorPreview String? // Max 10KB; first 50 error lines from JSONL
+
+  // Shopify metadata
+  bulkOperationId String? // GID of Shopify bulk operation
+
+  // Idempotency
+  inputHash String // SHA-256 hash of (shopId + all input params)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  shop   Shop       @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  events JobEvent[]
+
+  @@index([shopId, status])
+  @@index([inputHash])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// JOB EVENTS (Audit Log)
+// ============================================================================
+
+model JobEvent {
+  id        Int      @id @default(autoincrement())
+  jobId     String
+  eventType String   // Event type (e.g., "QUERY_STARTED", "MUTATION_COMPLETED")
+  message   String   // Human-readable log message
+  metadata  String?  // Optional JSON string for structured data
+  createdAt DateTime @default(now())
+
+  // Relations
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, createdAt])
+}

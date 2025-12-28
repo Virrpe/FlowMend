@@ -1,0 +1,29 @@
+# Shopify App Configuration
+# https://shopify.dev/docs/apps/tools/cli/configuration
+
+name = "flowmend"
+client_id = "655eabe3197f81c524f280f0b57b7cf8"
+application_url = "https://heads-dsc-setting-proven.trycloudflare.com"
+embedded = true
+
+[access_scopes]
+scopes = "read_products,write_products"
+
+[auth]
+redirect_urls = [
+  "https://heads-dsc-setting-proven.trycloudflare.com/auth/callback"
+]
+
+[webhooks]
+api_version = "2024-10"
+
+  [[webhooks.subscriptions]]
+    topics = [ "app/uninstalled" ]
+    uri = "/webhooks/app-uninstalled"
+
+[pos]
+embedded = false
+
+[build]
+automatically_update_urls_on_dev = true
+dev_store_url = "flowmend.myshopify.com"

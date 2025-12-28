@@ -1,0 +1,59 @@
+# Shopify Flow Action Extension Configuration
+# https://shopify.dev/docs/apps/flow/actions
+
+api_version = "2024-10"
+uid = "0797909e-e621-c3c0-7dd0-9e363875fef37e73b03b"
+type = "flow_action"
+name = "bulk-set-metafield"
+handle = "bulk-set-metafield"
+runtime_url = "https://heads-dsc-setting-proven.trycloudflare.com/webhooks/flow-action"
+
+[settings]
+  [[settings.fields]]
+    key = "query_string"
+    name = "Product query"
+    description = "Search query to select products (e.g., 'status:active tag:featured')"
+    type = "single_line_text_field"
+    required = true
+
+  [[settings.fields]]
+    key = "namespace"
+    name = "Metafield namespace"
+    description = "Namespace for the metafield (lowercase, alphanumeric + underscore)"
+    type = "single_line_text_field"
+    required = true
+
+  [[settings.fields]]
+    key = "key"
+    name = "Metafield key"
+    description = "Key for the metafield (lowercase, alphanumeric + underscore)"
+    type = "single_line_text_field"
+    required = true
+
+  [[settings.fields]]
+    key = "type"
+    name = "Metafield type"
+    description = "Data type of the metafield value"
+    type = "single_line_text_field"
+    required = true
+
+  [[settings.fields]]
+    key = "value"
+    name = "Metafield value"
+    description = "Value to set (interpreted based on type)"
+    type = "multi_line_text_field"
+    required = true
+
+  [[settings.fields]]
+    key = "dry_run"
+    name = "Dry-run mode"
+    description = "If true, only preview matched products without updating (recommended for first run)"
+    type = "boolean"
+    required = false
+
+  [[settings.fields]]
+    key = "max_items"
+    name = "Maximum items"
+    description = "Maximum number of products to process (hard cap: 100,000)"
+    type = "number_integer"
+    required = false
