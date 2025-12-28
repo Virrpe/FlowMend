@@ -7,7 +7,7 @@
     "dev": "remix dev",
     "build": "prisma generate && remix build",
     "start": "remix-serve build",
-    "deploy": "prisma migrate deploy && npm run start",
+    "deploy": "prisma db push --accept-data-loss && npm run start",
     "typecheck": "tsc --noEmit",
     "lint": "eslint --ext .ts,.tsx app server",
     "test": "vitest",
