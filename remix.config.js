@@ -5,7 +5,7 @@ export default {
   assetsBuildDirectory: 'public/build',
   publicPath: '/build/',
   serverBuildPath: 'build/index.js',
-  serverModuleFormat: 'esm',
+  serverModuleFormat: 'cjs',
   future: {
     v2_errorBoundary: true,
     v2_meta: true,
