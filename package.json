@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "remix dev",
-    "build": "npm run ui:build && remix build && prisma generate",
+    "build": "npm run ui:install && npm run ui:build && remix build && prisma generate",
     "start": "node server.js",
     "worker:dev": "tsx watch server/jobs/worker.ts",
     "worker:build": "esbuild server/jobs/worker.ts --bundle --platform=node --outfile=dist/worker.js --external:@prisma/client --external:ioredis",
