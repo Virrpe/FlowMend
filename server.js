@@ -546,6 +546,7 @@ app.get('/auth/callback', async (req, res) => {
 
   console.log(`🔐 HMAC Validation for ${shop}:`);
   console.log(`Raw query string: ${queryString}`);
+  console.log(`API Secret set: ${!!process.env.SHOPIFY_API_SECRET}, length: ${process.env.SHOPIFY_API_SECRET?.length}`);
 
   // Parse parameters manually without URL decoding
   const params = queryString.split('&').map(param => {
