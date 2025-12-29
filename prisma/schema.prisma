@@ -96,3 +96,22 @@ model JobEvent {
 
   @@index([jobId, createdAt])
 }
+
+// ============================================================================
+// COMPLIANCE REQUESTS (GDPR)
+// ============================================================================
+
+model ComplianceRequest {
+  id         String   @id @default(uuid())
+  shopDomain String   // Shop domain that the request is for
+  requestType String  // "customers/data_request" | "customers/redact" | "shop/redact"
+  customerId String?  // Shopify customer ID (for customer requests)
+  ordersUrl  String?  // URL to orders endpoint (for customer requests)
+  status     String   @default("RECEIVED") // RECEIVED | PROCESSED | FAILED
+  payload    String?  // Full webhook payload as JSON (for audit)
+  processedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([shopDomain, requestType, createdAt])
+  @@index([status])
+}

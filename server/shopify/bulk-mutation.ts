@@ -7,6 +7,7 @@ import { createShopifyClient, executeQuery } from './client.js';
 import { buildMutationJsonl } from './jsonl-builder.js';
 import logger from '../utils/logger.js';
 import { decryptToken } from '../utils/encryption.js';
+import { streamJsonlCounts } from '../utils/stream-jsonl.js';
 import type { Shop, Job } from '@prisma/client';
 import type { JobResult, BulkOperationStatus } from '../types/index.js';
 import { Blob } from 'buffer';
@@ -267,49 +268,27 @@ async function pollBulkOperationMutation(
     elapsedTime += pollInterval;
   }
 
-  throw new Error('Bulk operation timed out after 2 hours');
+  throw new Error(
+    'TIMEOUT: Bulk mutation operation timed out after 2 hours. ' +
+    'This may indicate a Shopify API issue or an unusually large batch. ' +
+    'Try: (1) Split into smaller batches with max_items, (2) Check Shopify status page, (3) Contact support with Job ID.'
+  );
 }
 
-// Helper: Download and parse mutation results
+// Helper: Download and parse mutation results using streaming (B4)
 async function downloadAndParseMutationResults(
   url: string
 ): Promise<Omit<JobResult, 'bulkOperationId'>> {
-  const response = await fetch(url);
-  const jsonlContent = await response.text();
+  // B4: Use streaming to avoid loading entire JSONL into memory
+  // Critical for handling 100K+ mutation results
+  logger.info({ url }, 'Streaming JSONL mutation results');
 
-  let updatedCount = 0;
-  let failedCount = 0;
-  const errorLines: string[] = [];
+  const { successCount, failedCount, errorPreview } = await streamJsonlCounts(url, 50);
 
-  const lines = jsonlContent.split('\n');
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-
-    const obj = JSON.parse(line);
-
-    // Check for userErrors
-    if (obj.userErrors && obj.userErrors.length > 0) {
-      failedCount++;
-      if (errorLines.length < 50) {
-        errorLines.push(line);
-      }
-    } else {
-      updatedCount++;
-    }
-  }
-
-  let errorPreview: string | null = null;
-  if (errorLines.length > 0) {
-    errorPreview = errorLines.join('\n');
-    // Truncate to 10KB
-    if (Buffer.byteLength(errorPreview, 'utf8') > 10 * 1024) {
-      errorPreview = errorPreview.substring(0, 10 * 1024) + '\n... (truncated)';
-    }
-  }
+  logger.info({ successCount, failedCount }, 'Finished streaming mutation results');
 
   return {
-    updatedCount,
+    updatedCount: successCount,
     failedCount,
     errorPreview,
   };

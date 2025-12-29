@@ -6,6 +6,7 @@
 import { createShopifyClient, executeQuery } from './client.js';
 import logger from '../utils/logger.js';
 import { decryptToken } from '../utils/encryption.js';
+import { streamProductIds } from '../utils/stream-jsonl.js';
 import type { Shop } from '@prisma/client';
 import type { BulkOperationStatus } from '../types/index.js';
 
@@ -140,33 +141,22 @@ async function pollBulkOperationQuery(
     elapsedTime += pollInterval;
   }
 
-  throw new Error('Bulk operation timed out after 30 minutes');
+  throw new Error(
+    'TIMEOUT: Bulk query operation timed out after 30 minutes. ' +
+    'This may happen with very large product catalogs. ' +
+    'Try: (1) Use a more specific query, (2) Reduce max_items, (3) Retry during off-peak hours.'
+  );
 }
 
-// Helper: Download and parse query results
+// Helper: Download and parse query results using streaming (B4)
 async function downloadAndParseQueryResults(url: string, maxItems: number): Promise<string[]> {
-  // TODO: Implement JSONL download and parsing
-  // 1. Fetch JSONL from URL
-  // 2. Parse lines
-  // 3. Extract product IDs
-  // 4. Return array (up to maxItems)
+  // B4: Use streaming to avoid loading entire JSONL into memory
+  // Critical for handling 100K+ product results
+  logger.info({ url, maxItems }, 'Streaming JSONL query results');
 
-  const response = await fetch(url);
-  const jsonlContent = await response.text();
+  const productIds = await streamProductIds(url, maxItems);
 
-  const productIds: string[] = [];
-  const lines = jsonlContent.split('\n');
-
-  for (const line of lines) {
-    if (productIds.length >= maxItems) break;
-    if (!line.trim()) continue;
-
-    const obj = JSON.parse(line);
-    if (obj.id) {
-      productIds.push(obj.id);
-    }
-  }
-
+  logger.info({ count: productIds.length }, 'Finished streaming product IDs');
   return productIds;
 }
 

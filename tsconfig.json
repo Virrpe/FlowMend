@@ -20,5 +20,5 @@
     }
   },
   "include": ["app", "server", "remix.env.d.ts", "**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", "build", "dist", ".cache", "get-access-token.ts", "test-shopify-credentials.ts"]
+  "exclude": ["node_modules", "build", "dist", ".cache", "get-access-token.ts", "test-shopify-credentials.ts", "simple-server.ts"]
 }
