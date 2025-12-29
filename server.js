@@ -534,23 +534,49 @@ app.get('/auth', (req, res) => {
 
 // OAuth callback
 app.get('/auth/callback', async (req, res) => {
-  const { code, shop } = req.query;
+  const { code, shop, hmac } = req.query;
 
-  if (!code || !shop) {
+  if (!code || !shop || !hmac) {
     return res.status(400).send('Missing required parameters');
+  }
+
+  // Validate HMAC
+  const queryParams = { ...req.query };
+  const queryHmac = queryParams.hmac;
+  delete queryParams.hmac;
+
+  const sortedParams = Object.keys(queryParams)
+    .sort()
+    .map(key => `${key}=${queryParams[key]}`)
+    .join('&');
+
+  const calculatedHmac = crypto
+    .createHmac('sha256', process.env.SHOPIFY_API_SECRET)
+    .update(sortedParams)
+    .digest('hex');
+
+  if (calculatedHmac !== queryHmac) {
+    console.error(`❌ HMAC validation failed for ${shop}`);
+    return res.status(403).send('HMAC validation failed');
   }
 
   try {
     // Exchange code for access token
     const tokenUrl = `https://${shop}/admin/oauth/access_token`;
+    const params = {
+      client_id: process.env.SHOPIFY_API_KEY,
+      client_secret: process.env.SHOPIFY_API_SECRET,
+      code,
+    };
+
+    console.log(`🔄 Exchanging OAuth code for ${shop}`);
+    console.log(`Token URL: ${tokenUrl}`);
+    console.log(`Params: client_id=${params.client_id?.substring(0, 8)}..., code=${code?.substring(0, 8)}...`);
+
     const response = await fetch(tokenUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: process.env.SHOPIFY_API_KEY,
-        client_secret: process.env.SHOPIFY_API_SECRET,
-        code,
-      }),
+      body: new URLSearchParams(params),
     });
 
     // Check response status before parsing
