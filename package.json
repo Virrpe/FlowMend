@@ -15,6 +15,7 @@
     "ui:install": "cd ui && npm install",
     "postinstall": "prisma generate",
     "db:migrate:deploy": "prisma migrate deploy",
+    "db:baseline": "node scripts/baseline-migrations.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint --ext .ts,.tsx app server",
     "test": "vitest",
