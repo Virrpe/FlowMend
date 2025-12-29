@@ -545,8 +545,8 @@ app.get('/auth/callback', async (req, res) => {
     const tokenUrl = `https://${shop}/admin/oauth/access_token`;
     const response = await fetch(tokenUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
         client_id: process.env.SHOPIFY_API_KEY,
         client_secret: process.env.SHOPIFY_API_SECRET,
         code,
