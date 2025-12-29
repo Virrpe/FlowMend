@@ -550,15 +550,25 @@ app.get('/auth/callback', async (req, res) => {
     .map(key => `${key}=${queryParams[key]}`)
     .join('&');
 
+  console.log(`🔐 HMAC Validation for ${shop}:`);
+  console.log(`Sorted params: ${sortedParams}`);
+  console.log(`Received HMAC: ${queryHmac}`);
+
   const calculatedHmac = crypto
     .createHmac('sha256', process.env.SHOPIFY_API_SECRET)
     .update(sortedParams)
     .digest('hex');
 
+  console.log(`Calculated HMAC: ${calculatedHmac}`);
+
   if (calculatedHmac !== queryHmac) {
     console.error(`❌ HMAC validation failed for ${shop}`);
+    console.error(`Expected: ${queryHmac}`);
+    console.error(`Got: ${calculatedHmac}`);
     return res.status(403).send('HMAC validation failed');
   }
+
+  console.log(`✅ HMAC validation passed for ${shop}`);
 
   try {
     // Exchange code for access token
