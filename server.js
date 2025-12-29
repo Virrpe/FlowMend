@@ -544,18 +544,26 @@ app.get('/auth/callback', async (req, res) => {
   // Get raw query string from URL (after the '?')
   const queryString = req.url.split('?')[1];
 
-  // Parse parameters manually to preserve URL encoding
-  const params = new URLSearchParams(queryString);
-  const receivedHmac = params.get('hmac');
-  params.delete('hmac');
+  console.log(`🔐 HMAC Validation for ${shop}:`);
+  console.log(`Raw query string: ${queryString}`);
 
-  // Sort and build query string for HMAC calculation
-  const sortedParams = Array.from(params.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([key, value]) => `${key}=${value}`)
+  // Parse parameters manually without URL decoding
+  const params = queryString.split('&').map(param => {
+    const [key, value] = param.split('=');
+    return { key, value };
+  });
+
+  // Find and extract HMAC
+  const hmacParam = params.find(p => p.key === 'hmac');
+  const receivedHmac = hmacParam?.value;
+
+  // Remove HMAC and sort remaining params
+  const sortedParams = params
+    .filter(p => p.key !== 'hmac')
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map(p => `${p.key}=${p.value}`)
     .join('&');
 
-  console.log(`🔐 HMAC Validation for ${shop}:`);
   console.log(`Sorted params: ${sortedParams}`);
   console.log(`Received HMAC: ${receivedHmac}`);
 
