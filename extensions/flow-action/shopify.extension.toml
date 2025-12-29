@@ -1,12 +1,13 @@
 # Shopify Flow Action Extension Configuration
 # https://shopify.dev/docs/apps/flow/actions
 
-api_version = "2024-10"
+api_version = "2025-10"
 uid = "0797909e-e621-c3c0-7dd0-9e363875fef37e73b03b"
 type = "flow_action"
 name = "bulk-set-metafield"
 handle = "bulk-set-metafield"
-runtime_url = "https://heads-dsc-setting-proven.trycloudflare.com/webhooks/flow-action"
+description = "Safely bulk-set metafields on products matching a search query with dry-run preview and validation"
+runtime_url = "https://flowmend-production.up.railway.app/webhooks/flow-action"
 
 [settings]
   [[settings.fields]]
