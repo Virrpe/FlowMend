@@ -553,6 +553,15 @@ app.get('/auth/callback', async (req, res) => {
       }),
     });
 
+    // Check response status before parsing
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ OAuth token exchange failed for ${shop}:`);
+      console.error(`Status: ${response.status} ${response.statusText}`);
+      console.error(`Response body: ${errorText.substring(0, 500)}`);
+      throw new Error(`Token exchange failed: ${response.status} ${response.statusText}`);
+    }
+
     const data = await response.json();
     const accessToken = data.access_token;
 
