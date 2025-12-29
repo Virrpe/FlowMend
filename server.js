@@ -540,19 +540,24 @@ app.get('/auth/callback', async (req, res) => {
     return res.status(400).send('Missing required parameters');
   }
 
-  // Validate HMAC
-  const queryParams = { ...req.query };
-  const queryHmac = queryParams.hmac;
-  delete queryParams.hmac;
+  // Validate HMAC using raw query string
+  // Get raw query string from URL (after the '?')
+  const queryString = req.url.split('?')[1];
 
-  const sortedParams = Object.keys(queryParams)
-    .sort()
-    .map(key => `${key}=${queryParams[key]}`)
+  // Parse parameters manually to preserve URL encoding
+  const params = new URLSearchParams(queryString);
+  const receivedHmac = params.get('hmac');
+  params.delete('hmac');
+
+  // Sort and build query string for HMAC calculation
+  const sortedParams = Array.from(params.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([key, value]) => `${key}=${value}`)
     .join('&');
 
   console.log(`🔐 HMAC Validation for ${shop}:`);
   console.log(`Sorted params: ${sortedParams}`);
-  console.log(`Received HMAC: ${queryHmac}`);
+  console.log(`Received HMAC: ${receivedHmac}`);
 
   const calculatedHmac = crypto
     .createHmac('sha256', process.env.SHOPIFY_API_SECRET)
@@ -561,9 +566,9 @@ app.get('/auth/callback', async (req, res) => {
 
   console.log(`Calculated HMAC: ${calculatedHmac}`);
 
-  if (calculatedHmac !== queryHmac) {
+  if (calculatedHmac !== receivedHmac) {
     console.error(`❌ HMAC validation failed for ${shop}`);
-    console.error(`Expected: ${queryHmac}`);
+    console.error(`Expected: ${receivedHmac}`);
     console.error(`Got: ${calculatedHmac}`);
     return res.status(403).send('HMAC validation failed');
   }
