@@ -3,7 +3,7 @@
 
 name = "flowmend"
 client_id = "655eabe3197f81c524f280f0b57b7cf8"
-application_url = "https://heads-dsc-setting-proven.trycloudflare.com"
+application_url = "https://flowmend-production.up.railway.app"
 embedded = true
 
 [access_scopes]
@@ -11,15 +11,19 @@ scopes = "read_products,write_products"
 
 [auth]
 redirect_urls = [
-  "https://heads-dsc-setting-proven.trycloudflare.com/auth/callback"
+  "https://flowmend-production.up.railway.app/auth/callback"
 ]
 
 [webhooks]
-api_version = "2024-10"
+api_version = "2025-10"
 
   [[webhooks.subscriptions]]
     topics = [ "app/uninstalled" ]
     uri = "/webhooks/app-uninstalled"
+
+  [[webhooks.subscriptions]]
+    compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+    uri = "/webhooks"
 
 [pos]
 embedded = false
