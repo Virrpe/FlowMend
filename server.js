@@ -696,10 +696,30 @@ app.post('/webhooks/flow-action', async (req, res) => {
       }
     }
 
-    const { query_string, namespace, key, type, value, dry_run, max_items } = req.body;
+    // Extract from properties first, with fallback to req.body for backwards compatibility
+    const payload = req.body.properties || req.body;
+    const {
+      query_string,
+      namespace,
+      key,
+      type,
+      value,
+      dry_run,
+      max_items
+    } = payload;
+
+    // Defensive query_string extraction with fallbacks
+    const rawQuery =
+      req.body.properties?.query_string ??
+      req.body.properties?.product_query ??
+      req.body.properties?.queryString ??
+      req.body.query_string ??
+      req.body.product_query;
+
+    const query_string_final = String(rawQuery ?? '').trim();
 
     // Validate required fields
-    if (!query_string || query_string.trim() === '') {
+    if (!query_string_final || query_string_final.trim() === '') {
       console.log(`❌ Empty query_string rejected for ${shop}`);
       return res.status(400).json({
         ok: false,
@@ -707,8 +727,8 @@ app.post('/webhooks/flow-action', async (req, res) => {
       });
     }
 
-    // Create input hash for idempotency
-    const inputString = `${shop}|${query_string}|${namespace}|${key}|${type}|${value}|${dry_run}|${max_items}`;
+    // Create input hash for idempotency using the validated query_string_final
+    const inputString = `${shop}|${query_string_final}|${namespace}|${key}|${type}|${value}|${dry_run}|${max_items}`;
     const inputHash = crypto.createHash('sha256').update(inputString).digest('hex');
 
     // Check for duplicate PENDING or RUNNING jobs
@@ -740,7 +760,7 @@ app.post('/webhooks/flow-action', async (req, res) => {
     const job = await prisma.job.create({
       data: {
         shopId: shop,
-        queryString: query_string,
+        queryString: query_string_final,
         namespace,
         key,
         type,
