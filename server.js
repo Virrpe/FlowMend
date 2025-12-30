@@ -661,23 +661,45 @@ const WEBHOOK_ID_PREFIX = 'webhook:processed:';
 
 // Webhook endpoint (Flow Action)
 app.post('/webhooks/flow-action', async (req, res) => {
-  const shop = req.headers['x-shopify-shop-domain'];
+  const body = req.body;
+  // Parse shopifyDomain from multiple sources (header first, then body fields)
+  const shopifyDomain =
+    req.headers['x-shopify-shop-domain'] ||
+    body.shopify_domain ||
+    body.shopifyDomain ||
+    null;
   const hmac = req.headers['x-shopify-hmac-sha256'];
   const webhookId = req.headers['x-shopify-webhook-id']; // B2: Capture webhook ID
-  const body = JSON.stringify(req.body);
+  const bodyString = JSON.stringify(body);
 
   // Verify HMAC
   const hash = crypto
     .createHmac('sha256', process.env.SHOPIFY_API_SECRET)
-    .update(body, 'utf8')
+    .update(bodyString, 'utf8')
     .digest('base64');
 
   if (hash !== hmac) {
-    console.log(`❌ HMAC verification failed for ${shop}`);
+    console.log(`❌ HMAC verification failed for ${shopifyDomain}`);
     return res.status(401).json({ error: 'Invalid HMAC signature' });
   }
 
-  console.log(`✅ Webhook received from ${shop} (webhookId: ${webhookId || 'none'})`);
+  // Validate shopifyDomain is present
+  if (!shopifyDomain) {
+    console.log(`Missing shopify_domain in flow-action webhook`);
+    return res.status(400).json({ ok: false, error: 'shopify_domain is required' });
+  }
+
+  // Lookup shop to get valid relation ID
+  const shopRow = await prisma.shop.findUnique({
+    where: { id: shopifyDomain },
+  });
+
+  if (!shopRow) {
+    console.log(`Shop not installed: ${shopifyDomain}`);
+    return res.status(401).json({ ok: false, error: 'shop not installed' });
+  }
+
+  console.log(`✅ Webhook received from ${shopifyDomain} (webhookId: ${webhookId || 'none'})`);
 
   try {
     // B2: Check for duplicate webhook by X-Shopify-Webhook-Id
@@ -720,7 +742,7 @@ app.post('/webhooks/flow-action', async (req, res) => {
 
     // Validate required fields
     if (!query_string_final || query_string_final.trim() === '') {
-      console.log(`❌ Empty query_string rejected for ${shop}`);
+      console.log(`❌ Empty query_string rejected for ${shopifyDomain}`);
       return res.status(400).json({
         ok: false,
         error: 'query_string is required and cannot be empty'
@@ -728,7 +750,7 @@ app.post('/webhooks/flow-action', async (req, res) => {
     }
 
     // Create input hash for idempotency using the validated query_string_final
-    const inputString = `${shop}|${query_string_final}|${namespace}|${key}|${type}|${value}|${dry_run}|${max_items}`;
+    const inputString = `${shopifyDomain}|${query_string_final}|${namespace}|${key}|${type}|${value}|${dry_run}|${max_items}`;
     const inputHash = crypto.createHash('sha256').update(inputString).digest('hex');
 
     // Check for duplicate PENDING or RUNNING jobs
@@ -756,10 +778,10 @@ app.post('/webhooks/flow-action', async (req, res) => {
       });
     }
 
-    // Create Job record in database
+    // Create Job record in database using connect pattern
     const job = await prisma.job.create({
       data: {
-        shopId: shop,
+        shop: { connect: { id: shopRow.id } },
         queryString: query_string_final,
         namespace,
         key,
@@ -786,7 +808,7 @@ app.post('/webhooks/flow-action', async (req, res) => {
     });
 
     // Enqueue to BullMQ
-    await jobQueue.add('process-job', { jobId: job.id, shopId: shop }, { jobId: job.id });
+    await jobQueue.add('process-job', { jobId: job.id, shopId: shopRow.id }, { jobId: job.id });
 
     console.log(`✅ Job created and enqueued: ${job.id}`);
     res.status(200).json({
