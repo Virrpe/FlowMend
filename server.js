@@ -29,6 +29,15 @@ const jobQueue = new Queue('flowmend-jobs', { connection });
 
 // Parse JSON for webhooks
 app.use(express.json());
+app.get("/", (req,res)=> {
+  const hasQuery = typeof req.originalUrl==="string" && req.originalUrl.includes("?");
+  const hasShopParam = (req.query && req.query.shop) || (typeof req.originalUrl==="string" && req.originalUrl.includes("shop="));
+  if (hasShopParam) {
+    const qs = hasQuery ? req.originalUrl.slice(1) : "";
+    return res.redirect(302, `/auth${qs}`);
+  }
+  return res.redirect(302, "/app");
+});
 
 // ============================================================================
 // SESSION TOKEN VERIFICATION MIDDLEWARE
