@@ -13,7 +13,7 @@ import { enqueueJob } from '~/jobs/enqueuer.server';
 import logger from '~/utils/logger.server';
 import prisma from '~/db/client.server';
 
-// Zod schema for Flow action input validation
+// Zod schema for Flow action input validation (from properties object)
 const FlowActionInputSchema = z.object({
   query_string: z.string().min(1).max(500),
   namespace: z.string().regex(/^[a-z0-9_]+$/).max(50),
@@ -31,15 +31,15 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     // Extract headers
     const hmacSignature = request.headers.get('X-Shopify-Hmac-Sha256');
-    const shopDomain = request.headers.get('X-Shopify-Shop-Domain');
+    const shopDomainHeader = request.headers.get('X-Shopify-Shop-Domain');
 
-    if (!hmacSignature || !shopDomain) {
-      logger.warn({ shopDomain }, 'Missing required headers in Flow action request');
+    // Verify HMAC first
+    const bodyRaw = await request.text();
+    if (!hmacSignature) {
+      logger.warn({}, 'Missing HMAC signature in Flow action request');
       return json({ error: 'Missing required headers' }, { status: 400 });
     }
 
-    // Verify HMAC
-    const bodyRaw = await request.text();
     const isValid = verifyHmac(
       bodyRaw,
       hmacSignature,
@@ -47,30 +47,82 @@ export async function action({ request }: ActionFunctionArgs) {
     );
 
     if (!isValid) {
-      logger.warn({ shopDomain }, 'HMAC validation failed');
+      logger.warn({}, 'HMAC validation failed');
       return json({ error: 'Invalid signature' }, { status: 401 });
     }
 
-    // Parse and validate body
+    // Parse body
     const body = JSON.parse(bodyRaw);
-    const validationResult = FlowActionInputSchema.safeParse(body);
 
+    // Extract shop context from top-level fields or headers
+    const shopifyDomain =
+      body?.shopify_domain ??
+      body?.shopifyDomain ??
+      shopDomainHeader ??
+      null;
+    const shopIdRaw =
+      body?.shop_id ??
+      body?.shopId ??
+      body?.shopID ??
+      null;
+
+    if (!shopifyDomain) {
+      logger.warn({}, 'shopify_domain is required');
+      return json({ ok: false, error: 'shopify_domain is required' }, { status: 400 });
+    }
+
+    // Extract action inputs from properties object
+    const props = body?.properties ?? {};
+    const query_string = props?.query_string ?? props?.product_query ?? null;
+    const namespace = props?.namespace ?? null;
+    const key = props?.key ?? null;
+    const type = props?.type ?? null;
+    const value = props?.value ?? null;
+    const dry_run = props?.dry_run ?? false;
+    const max_items = props?.max_items ?? 100;
+
+    if (!query_string) {
+      logger.warn({ shopifyDomain }, 'query_string is required');
+      return json({ ok: false, error: 'query_string is required' }, { status: 400 });
+    }
+
+    // Build input object for validation
+    const input = {
+      query_string,
+      namespace: namespace || '',
+      key: key || '',
+      type: type || 'single_line_text_field',
+      value: value || '',
+      dry_run,
+      max_items,
+      action_run_id: body?.action_run_id ?? null,
+    };
+
+    // Validate input
+    const validationResult = FlowActionInputSchema.safeParse(input);
     if (!validationResult.success) {
-      logger.warn({ shopDomain, errors: validationResult.error.errors }, 'Input validation failed');
+      logger.warn({ shopifyDomain, errors: validationResult.error.errors }, 'Input validation failed');
       return json({
+        ok: false,
         error: 'Invalid input',
         details: validationResult.error.errors
       }, { status: 400 });
     }
 
-    const input = validationResult.data;
+    const validatedInput = validationResult.data;
 
     // Verify shop is installed
-    const shop = await prisma.shop.findUnique({ where: { id: shopDomain } });
-    if (!shop || shop.uninstalledAt) {
-      logger.warn({ shopDomain }, 'Shop not found or uninstalled');
-      return json({ error: 'Shop not authorized' }, { status: 403 });
+    const shopRow = await prisma.shop.findUnique({ where: { id: shopifyDomain } });
+    if (!shopRow || shopRow.uninstalledAt) {
+      logger.warn({ shopifyDomain }, 'Shop not installed');
+      return json({ ok: false, error: 'shop not installed' }, { status: 401 });
     }
+
+    console.log(`Flow action received`, {
+      shopifyDomain,
+      action_run_id: body?.action_run_id,
+      action_definition_id: body?.action_definition_id,
+    });
 
     // Create job with idempotency check
     let job;
@@ -78,14 +130,14 @@ export async function action({ request }: ActionFunctionArgs) {
 
     try {
       job = await createJob({
-        shopId: shopDomain,
-        queryString: input.query_string,
-        namespace: input.namespace,
-        key: input.key,
-        type: input.type,
-        value: input.value,
-        dryRun: input.dry_run,
-        maxItems: input.max_items,
+        shopId: shopRow.id,
+        queryString: validatedInput.query_string,
+        namespace: validatedInput.namespace,
+        key: validatedInput.key,
+        type: validatedInput.type,
+        value: validatedInput.value,
+        dryRun: validatedInput.dry_run,
+        maxItems: validatedInput.max_items,
       });
     } catch (error) {
       if (error instanceof DuplicateJobError) {
@@ -98,7 +150,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
         logger.info({
           jobId: error.existingJobId,
-          shopDomain,
+          shopifyDomain,
           elapsed: Date.now() - startTime
         }, 'Deduped Flow action request');
 
@@ -114,12 +166,12 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     // Enqueue job for processing
-    await enqueueJob(job.id, shopDomain);
+    await enqueueJob(job.id, shopifyDomain);
 
     logger.info({
       jobId: job.id,
-      shopDomain,
-      dryRun: input.dry_run,
+      shopifyDomain,
+      dryRun: validatedInput.dry_run,
       elapsed: Date.now() - startTime
     }, 'Flow action job enqueued');
 
