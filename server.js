@@ -649,15 +649,17 @@ app.get('/auth/callback', async (req, res) => {
     });
 
     console.log(`✅ OAuth successful for ${shop}`);
-    res.send(`
-      <html>
-        <body style="font-family: system-ui; max-width: 600px; margin: 100px auto; padding: 20px;">
-          <h1 style="color: #008060;">✅ Installation Complete!</h1>
-          <p>FlowMend has been successfully installed to <strong>${shop}</strong></p>
-          <p>You can close this window and return to your admin.</p>
-        </body>
-      </html>
-    `);
+    const adminUrl = `https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}`;
+    res.setHeader('Content-Type', 'text/html');
+    res.send(`<!DOCTYPE html>
+<html>
+<head><title>Redirecting to FlowMend App...</title></head>
+<body>
+  <div>Installation complete. Redirecting...</div>
+  <script>window.top.location.href = ${JSON.stringify(adminUrl)};</script>
+  <noscript><a href="${adminUrl.replace(/"/g, '"')}">Open FlowMend in Shopify Admin</a></noscript>
+</body>
+</html>`);
   } catch (error) {
     console.error('OAuth error:', error);
     res.status(500).send('OAuth failed: ' + error.message);
