@@ -17,35 +17,21 @@ import { Settings } from './pages/Settings';
 
 export function App() {
   const apiKey = import.meta.env.VITE_SHOPIFY_API_KEY || '';
-  if (!apiKey) {
-    console.error('AppBridgeError: VITE_SHOPIFY_API_KEY env var missing. Set in Railway web service vars.');
-    const location = useLocation();
-    const params = new URLSearchParams(location.search);
-    const host = params.get('host') || '';
-    if (!host) {
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', padding: '2rem' }}>
-          <h2>Missing host parameter</h2>
-          <p>Open FlowMend from Shopify Admin Apps list.</p>
-          <p>Current URL: {window.location.href}</p>
-        </div>
-      );
-    }
-    const appBridgeConfig = {
-      apiKey,
-      host,
-      forceRedirect: true,
-    };
+  const location = useLocation();
+  const host = new URLSearchParams(location.search).get('host') || '';
+  if (!apiKey || !host) {
     return (
-      <html>
-        <head><title>Config Error</title></head>
-        <body style="font-family:sans-serif; padding:2rem; text-align:center;">
-          <h1>App Configuration Error</h1>
-          <p>Missing <code>VITE_SHOPIFY_API_KEY</code>. Add to Railway "web" service environment variables (same as SHOPIFY_API_KEY).</p>
-        </body>
-      </html>
+      <div className="p-8 text-center">
+        <h1>Missing configuration</h1>
+        <p>{!apiKey ? 'Missing VITE_SHOPIFY_API_KEY' : 'Missing host query param; open app from Shopify Admin'}</p>
+      </div>
     );
   }
+  const appBridgeConfig = {
+    apiKey,
+    host,
+    forceRedirect: true,
+  };
   return (
     <AppBridgeProvider config={appBridgeConfig}>
       <AppProvider i18n={{}}>
