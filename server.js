@@ -649,17 +649,12 @@ app.get('/auth/callback', async (req, res) => {
     });
 
     console.log(`✅ OAuth successful for ${shop}`);
-    const adminUrl = `https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}`;
-    res.setHeader('Content-Type', 'text/html');
-    res.send(`<!DOCTYPE html>
-<html>
-<head><title>Redirecting to FlowMend App...</title></head>
-<body>
-  <div>Installation complete. Redirecting...</div>
-  <script>window.top.location.href = ${JSON.stringify(adminUrl)};</script>
-  <noscript><a href="${adminUrl.replace(/"/g, '"')}">Open FlowMend in Shopify Admin</a></noscript>
-</body>
-</html>`);
+    const host = req.query.host;
+    if (!host) {
+      return res.status(400).send('INVALID_CONFIG: host must be provided. Open the app from Shopify Admin so host is provided.');
+    }
+    const redirectUrl = `/app/?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`;
+    return res.redirect(302, redirectUrl);
   } catch (error) {
     console.error('OAuth error:', error);
     res.status(500).send('OAuth failed: ' + error.message);
