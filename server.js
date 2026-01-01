@@ -1003,6 +1003,28 @@ app.get(/^\/app$/, (req, res) => {
 });
 app.use('/app', express.static(path.join(__dirname, 'public/ui'), { redirect: false }));
 
+ /* embedded SPA routes live under /app/*; redirect root reloads to prevent 404s */
+
+app.get('/runs', (req, res) => {
+  const qs = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+  res.redirect(302, `/app/runs${qs}`);
+});
+
+app.get('/templates', (req, res) => {
+  const qs = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+  res.redirect(302, `/app/templates${qs}`);
+});
+
+app.get('/settings', (req, res) => {
+  const qs = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+  res.redirect(302, `/app/settings${qs}`);
+});
+
+app.get('/dashboard', (req, res) => {
+  const qs = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+  res.redirect(302, `/app/dashboard${qs}`);
+});
+
 // SPA fallback - serve index.html for all /app/* routes (client-side routing)
 app.get('/app/*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/ui/index.html'));
