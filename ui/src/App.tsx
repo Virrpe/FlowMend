@@ -2,7 +2,7 @@
  * FlowMend Admin UI - Main App Component
  */
 
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from '@shopify/polaris';
 import { Provider as AppBridgeProvider } from '@shopify/app-bridge-react';
 import '@shopify/polaris/build/esm/styles.css';
@@ -17,15 +17,11 @@ import { Settings } from './pages/Settings';
 
 export function App() {
   const apiKey = import.meta.env.VITE_SHOPIFY_API_KEY || '';
-  const location = useLocation();
-  const host = new URLSearchParams(location.search).get('host') || '';
+  const searchParams = new URLSearchParams(window.location.search);
+  const host = searchParams.get('host') || '';
   if (!apiKey || !host) {
-    return (
-      <div className="p-8 text-center">
-        <h1>Missing configuration</h1>
-        <p>{!apiKey ? 'Missing VITE_SHOPIFY_API_KEY' : 'Missing host query param; open app from Shopify Admin'}</p>
-      </div>
-    );
+    console.error('AppBridge config missing: API key or host param. Set VITE_SHOPIFY_API_KEY in ui/.env and access with ?host=yourshop.myshopify.com');
+    return <div>Error: App configuration missing! Check console.</div>;
   }
   const appBridgeConfig = {
     apiKey,
