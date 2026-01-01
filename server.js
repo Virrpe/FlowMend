@@ -1000,7 +1000,7 @@ app.post('/webhooks/shop/redact', async (req, res) => {
 
 // Serve static UI files
 app.use('/assets', express.static(path.join(__dirname, 'public', 'ui', 'assets')));
-app.use('/app', express.static(path.join(__dirname, 'public/ui')));
+app.use('/app', express.static(path.join(__dirname, 'public/ui'), { redirect: false }));
 
 // SPA fallback - serve index.html for all /app/* routes (client-side routing)
 app.get('/app/*', (req, res) => {
