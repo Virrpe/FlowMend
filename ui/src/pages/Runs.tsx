@@ -65,7 +65,7 @@ export function Runs() {
     <Link
       removeUnderline
       onClick={(event) => {
-        event.preventDefault();
+        event?.preventDefault();
         navigate(`/runs/${job.id}`);
       }}
       key={job.id}

@@ -19,8 +19,8 @@ export function NavigationFrame({ children }: NavigationFrameProps) {
       url: '/dashboard',
       selected: location.pathname === '/dashboard',
       onClick: (event) => {
-        event.preventDefault();
-        navigate('/dashboard');
+        event?.preventDefault();
+        navigate({ pathname: '/dashboard', search: location.search });
       },
     },
     {
@@ -28,8 +28,8 @@ export function NavigationFrame({ children }: NavigationFrameProps) {
       url: '/runs',
       selected: location.pathname.startsWith('/runs'),
       onClick: (event) => {
-        event.preventDefault();
-        navigate('/runs');
+        event?.preventDefault();
+        navigate({ pathname: '/runs', search: location.search });
       },
     },
     {
@@ -37,8 +37,8 @@ export function NavigationFrame({ children }: NavigationFrameProps) {
       url: '/templates',
       selected: location.pathname === '/templates',
       onClick: (event) => {
-        event.preventDefault();
-        navigate('/templates');
+        event?.preventDefault();
+        navigate({ pathname: '/templates', search: location.search });
       },
     },
     {
@@ -46,8 +46,8 @@ export function NavigationFrame({ children }: NavigationFrameProps) {
       url: '/settings',
       selected: location.pathname === '/settings',
       onClick: (event) => {
-        event.preventDefault();
-        navigate('/settings');
+        event?.preventDefault();
+        navigate({ pathname: '/settings', search: location.search });
       },
     },
   ];
