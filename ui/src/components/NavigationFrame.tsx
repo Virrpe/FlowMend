@@ -18,25 +18,37 @@ export function NavigationFrame({ children }: NavigationFrameProps) {
       label: 'Dashboard',
       url: '/dashboard',
       selected: location.pathname === '/dashboard',
-      onClick: () => navigate('/dashboard'),
+      onClick: (event) => {
+        event.preventDefault();
+        navigate('/dashboard');
+      },
     },
     {
       label: 'Runs',
       url: '/runs',
       selected: location.pathname.startsWith('/runs'),
-      onClick: () => navigate('/runs'),
+      onClick: (event) => {
+        event.preventDefault();
+        navigate('/runs');
+      },
     },
     {
       label: 'Templates',
       url: '/templates',
       selected: location.pathname === '/templates',
-      onClick: () => navigate('/templates'),
+      onClick: (event) => {
+        event.preventDefault();
+        navigate('/templates');
+      },
     },
     {
       label: 'Settings',
       url: '/settings',
       selected: location.pathname === '/settings',
-      onClick: () => navigate('/settings'),
+      onClick: (event) => {
+        event.preventDefault();
+        navigate('/settings');
+      },
     },
   ];
 

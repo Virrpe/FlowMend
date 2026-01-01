@@ -64,7 +64,10 @@ export function Runs() {
   const rows = jobs.map((job) => [
     <Link
       removeUnderline
-      onClick={() => navigate(`/runs/${job.id}`)}
+      onClick={(event) => {
+        event.preventDefault();
+        navigate(`/runs/${job.id}`);
+      }}
       key={job.id}
     >
       {job.id.slice(0, 8)}
