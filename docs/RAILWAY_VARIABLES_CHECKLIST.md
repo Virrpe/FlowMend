@@ -25,6 +25,7 @@ Both services share the same PostgreSQL database and Redis instance.
 
 ### Shopify App Credentials
 - `SHOPIFY_API_KEY` - Your app's API key from Shopify Partners dashboard
+- `VITE_SHOPIFY_API_KEY`: Shopify Partner Dashboard > Apps > [your app] > App setup > API key (same value as `SHOPIFY_API_KEY`, required for embedded UI Vite build)
 - `SHOPIFY_API_SECRET` - Your app's API secret from Shopify Partners dashboard
 - `SHOPIFY_SCOPES` - OAuth scopes (set to: `read_products,write_products`)
 - `SHOPIFY_APP_URL` - Your Railway web service URL (e.g., `https://flowmend-web-production.up.railway.app`)
