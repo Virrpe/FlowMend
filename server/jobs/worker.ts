@@ -31,6 +31,12 @@ worker.on('completed', (job) => {
 
 worker.on('failed', (job, error) => {
   logger.error({ jobId: job?.data.jobId, error }, 'Job failed');
+  console.error("JOB_FAILED", {
+    jobId: job.id,
+    name: job.name,
+    message: error.message,
+    stack: error.stack?.split('\n').slice(0,5).join('\n')
+  });
 });
 
 logger.info('Job worker started');
