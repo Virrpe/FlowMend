@@ -16,8 +16,8 @@ import prisma from '~/db/client.server';
 // Zod schema for Flow action input validation (from properties object)
 const FlowActionInputSchema = z.object({
   query_string: z.string().min(1).max(500),
-  namespace: z.string().regex(/^[a-z0-9_]+$/).max(50),
-  key: z.string().regex(/^[a-z0-9_]+$/).max(50),
+  namespace: z.string().regex(/^[a-z0-9_]*$/).max(50),
+  key: z.string().regex(/^[a-z0-9_]*$/).max(50),
   type: z.enum(['single_line_text_field', 'boolean', 'number_integer', 'json']),
   value: z.string().max(1024),
   dry_run: z.boolean().optional().default(true),
@@ -27,40 +27,16 @@ const FlowActionInputSchema = z.object({
 
 export async function action({ request }: ActionFunctionArgs) {
   const startTime = Date.now();
-  const timestamp = new Date().toISOString();
 
   try {
     // Extract headers
     const hmacSignature = request.headers.get('X-Shopify-Hmac-Sha256');
     const shopDomainHeader = request.headers.get('X-Shopify-Shop-Domain');
 
-    // [FLOW_WEBHOOK] Entry point logging
-    logger.info({
-      prefix: '[FLOW_WEBHOOK]',
-      timestamp,
-      shop: shopDomainHeader || 'unknown',
-      hasHmac: !!hmacSignature,
-    }, '[FLOW_WEBHOOK] Received webhook request');
-
     // Verify HMAC first
     const bodyRaw = await request.text();
 
-    // [FLOW_WEBHOOK] Log raw payload keys (sanitized - never values)
-    let payloadKeys: string[] = [];
-    try {
-      const parsedForKeys = JSON.parse(bodyRaw);
-      payloadKeys = Object.keys(parsedForKeys);
-    } catch {
-      payloadKeys = ['parse_error'];
-    }
-    logger.info({
-      prefix: '[FLOW_WEBHOOK]',
-      payloadKeys,
-      hasBody: bodyRaw.length > 0,
-    }, '[FLOW_WEBHOOK] Payload keys extracted');
-
     if (!hmacSignature) {
-      logger.warn({ prefix: '[FLOW_WEBHOOK]', error: 'missing_hmac' }, '[FLOW_WEBHOOK] Missing HMAC signature');
       return json({ error: 'Missing required headers' }, { status: 400 });
     }
 
@@ -71,12 +47,9 @@ export async function action({ request }: ActionFunctionArgs) {
     );
 
     if (!isValid) {
-      logger.warn({ prefix: '[FLOW_WEBHOOK]', error: 'hmac_invalid' }, '[FLOW_WEBHOOK] HMAC validation failed');
+      logger.warn({ shop: shopDomainHeader || 'unknown', error: 'hmac_invalid' }, 'Flow webhook HMAC validation failed');
       return json({ error: 'Invalid signature' }, { status: 401 });
     }
-
-    // [FLOW_WEBHOOK] Log HMAC success
-    logger.info({ prefix: '[FLOW_WEBHOOK]', step: 'hmac_valid' }, '[FLOW_WEBHOOK] HMAC validation passed');
 
     // Parse body
     const body = JSON.parse(bodyRaw);
@@ -87,41 +60,14 @@ export async function action({ request }: ActionFunctionArgs) {
       body?.shopifyDomain ??
       shopDomainHeader ??
       null;
-    const shopIdRaw =
-      body?.shop_id ??
-      body?.shopId ??
-      body?.shopID ??
-      null;
     const actionRunId = body?.action_run_id ?? null;
 
-    // [FLOW_WEBHOOK] Log extracted values before validation (sanitized)
     const props = body?.properties ?? {};
-    const hasQuery = !!props?.query_string || !!props?.product_query;
-    const hasNamespace = !!props?.namespace;
-    const hasKey = !!props?.key;
-    const hasType = !!props?.type;
-    const hasValue = !!props?.value;
     const dry_run = props?.dry_run ?? false;
     const max_items = props?.max_items ?? 100;
 
-    logger.info({
-      prefix: '[FLOW_WEBHOOK]',
-      shop: shopifyDomain || 'missing',
-      action_run_id: actionRunId,
-      extracted: {
-        hasQuery,
-        hasNamespace,
-        hasKey,
-        hasType,
-        hasValue,
-        dry_run,
-        max_items,
-        propsKeys: Object.keys(props),
-      },
-    }, '[FLOW_WEBHOOK] Extracted values before validation');
-
     if (!shopifyDomain) {
-      logger.warn({ prefix: '[FLOW_WEBHOOK]', error: 'missing_shop_domain' }, '[FLOW_WEBHOOK] shopify_domain is required');
+      logger.warn({ error: 'missing_shop_domain' }, 'Flow webhook missing shopify_domain');
       return json({ ok: false, error: 'shopify_domain is required' }, { status: 400 });
     }
 
@@ -133,7 +79,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const value = props?.value ?? null;
 
     if (!query_string) {
-      logger.warn({ prefix: '[FLOW_WEBHOOK]', shop: shopifyDomain, error: 'missing_query_string' }, '[FLOW_WEBHOOK] query_string is required');
+      logger.warn({ shop: shopifyDomain, error: 'missing_query_string' }, 'Flow webhook missing query_string');
       return json({ ok: false, error: 'query_string is required' }, { status: 400 });
     }
 
@@ -152,16 +98,12 @@ export async function action({ request }: ActionFunctionArgs) {
     // Validate input
     const validationResult = FlowActionInputSchema.safeParse(input);
 
-    // [FLOW_WEBHOOK] Log validation result
     if (!validationResult.success) {
-      const errorPaths = validationResult.error.errors.map(e => e.path.join('.'));
       logger.warn({
-        prefix: '[FLOW_WEBHOOK]',
         shop: shopifyDomain,
-        validation: 'FAILED',
-        errorPaths,
-        errorCount: validationResult.error.errors.length,
-      }, '[FLOW_WEBHOOK] Validation FAILED');
+        error: 'validation_failed',
+        details: validationResult.error.errors,
+      }, 'Flow webhook validation failed');
       return json({
         ok: false,
         error: 'Invalid input',
@@ -169,55 +111,24 @@ export async function action({ request }: ActionFunctionArgs) {
       }, { status: 400 });
     }
 
-    logger.info({
-      prefix: '[FLOW_WEBHOOK]',
-      shop: shopifyDomain,
-      validation: 'SUCCESS',
-    }, '[FLOW_WEBHOOK] Validation SUCCESS');
-
     const validatedInput = validationResult.data;
 
     // Verify shop is installed
     const shopRow = await prisma.shop.findUnique({ where: { id: shopifyDomain } });
 
-    // [FLOW_WEBHOOK] Log shop lookup result
     if (!shopRow) {
-      logger.warn({
-        prefix: '[FLOW_WEBHOOK]',
-        shop: shopifyDomain,
-        lookup: 'NOT_FOUND',
-      }, '[FLOW_WEBHOOK] Shop lookup NOT_FOUND');
+      logger.warn({ shop: shopifyDomain, error: 'shop_not_found' }, 'Flow webhook shop not found');
       return json({ ok: false, error: 'shop not installed' }, { status: 401 });
     }
 
     if (shopRow.uninstalledAt) {
-      logger.warn({
-        prefix: '[FLOW_WEBHOOK]',
-        shop: shopifyDomain,
-        lookup: 'UNINSTALLED',
-        uninstalledAt: shopRow.uninstalledAt.toISOString(),
-      }, '[FLOW_WEBHOOK] Shop lookup UNINSTALLED');
+      logger.warn({ shop: shopifyDomain, error: 'shop_uninstalled' }, 'Flow webhook shop uninstalled');
       return json({ ok: false, error: 'shop not installed' }, { status: 401 });
     }
-
-    logger.info({
-      prefix: '[FLOW_WEBHOOK]',
-      shop: shopifyDomain,
-      lookup: 'FOUND',
-    }, '[FLOW_WEBHOOK] Shop lookup FOUND');
 
     // Create job with idempotency check
     let job;
     let deduped = false;
-
-    // [FLOW_WEBHOOK] Log createJob attempt
-    logger.info({
-      prefix: '[FLOW_WEBHOOK]',
-      shop: shopifyDomain,
-      action_run_id: validatedInput.action_run_id,
-      dry_run: validatedInput.dry_run,
-      step: 'createJob_attempt',
-    }, '[FLOW_WEBHOOK] Creating job attempt');
 
     try {
       job = await createJob({
@@ -231,15 +142,6 @@ export async function action({ request }: ActionFunctionArgs) {
         actionRunId: validatedInput.action_run_id,
         maxItems: validatedInput.max_items,
       });
-
-      // [FLOW_WEBHOOK] Log successful job creation
-      logger.info({
-        prefix: '[FLOW_WEBHOOK]',
-        shop: shopifyDomain,
-        jobId: job.id,
-        action_run_id: validatedInput.action_run_id,
-        step: 'createJob_success',
-      }, '[FLOW_WEBHOOK] Job created successfully');
     } catch (error) {
       if (error instanceof DuplicateJobError) {
         // Job already exists - return existing job ID
@@ -248,15 +150,6 @@ export async function action({ request }: ActionFunctionArgs) {
           where: { id: error.existingJobId },
           select: { id: true, status: true },
         });
-
-        // [FLOW_WEBHOOK] Log duplicate job
-        logger.info({
-          prefix: '[FLOW_WEBHOOK]',
-          shop: shopifyDomain,
-          jobId: error.existingJobId,
-          status: 'DUPLICATE',
-          elapsed: Date.now() - startTime,
-        }, '[FLOW_WEBHOOK] Duplicate job - returning existing');
 
         // CRITICAL: Return 200 OK, not 409
         return json({
@@ -267,28 +160,16 @@ export async function action({ request }: ActionFunctionArgs) {
         }, { status: 200 });
       }
 
-      // [FLOW_WEBHOOK] Log createJob error before re-throwing
       logger.error({
-        prefix: '[FLOW_WEBHOOK]',
         shop: shopifyDomain,
-        step: 'createJob_error',
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
-        errorType: error?.constructor?.name || 'Unknown',
-      }, '[FLOW_WEBHOOK] Job creation failed');
+        error: 'createJob_failed',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      }, 'Flow webhook job creation failed');
       throw error;
     }
 
     // Enqueue job for processing
     await enqueueJob(job.id, shopifyDomain);
-
-    // [FLOW_WEBHOOK] Log successful enqueue and final response
-    logger.info({
-      prefix: '[FLOW_WEBHOOK]',
-      shop: shopifyDomain,
-      jobId: job.id,
-      status: 'ENQUEUED',
-      elapsed: Date.now() - startTime,
-    }, '[FLOW_WEBHOOK] Response: status=200 job enqueued');
 
     // CRITICAL: Return 200 OK immediately (not 202)
     return json({
@@ -301,14 +182,11 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-    // [FLOW_WEBHOOK] Log final error response
     logger.error({
-      prefix: '[FLOW_WEBHOOK]',
-      step: 'handler_error',
-      errorMessage,
-      errorType: error?.constructor?.name || 'Unknown',
+      error: 'handler_error',
+      message: errorMessage,
       elapsed: Date.now() - startTime,
-    }, '[FLOW_WEBHOOK] Response: status=500 internal error');
+    }, 'Flow webhook internal error');
 
     // Return 200 with error info to avoid retries
     return json({
